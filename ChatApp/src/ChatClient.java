@@ -14,7 +14,6 @@ public class ChatClient {
     private BufferedReader in;
 
 
-
     private JFrame frame;
     private CardLayout cardLayout;
     private JPanel mainPanel;
@@ -30,13 +29,15 @@ public class ChatClient {
     private JButton fileButton;
 
 
-
     private String username;
     private String currentChatUser;
     private File selectedFile;
 
+    private Set<String> onlineUsers = new HashSet<>();
 
-
+    private ImageIcon greenIcon;
+    private ImageIcon greyIcon;
+    private final int ICON_SIZE = 18;
 
 
     public static void main(String[] args) {
@@ -50,6 +51,8 @@ public class ChatClient {
         cardLayout = new CardLayout();
         mainPanel = new JPanel(cardLayout);
 
+        loadIcons();
+
         createRegisterPage();
         createLoginPage();
         createChatPage();
@@ -58,6 +61,11 @@ public class ChatClient {
         frame.setVisible(true);
 
         connectToServer();
+    }
+
+    private void loadIcons() {
+        greenIcon = new ImageIcon(new ImageIcon(getClass().getResource("/green.png")).getImage().getScaledInstance(ICON_SIZE, ICON_SIZE, Image.SCALE_SMOOTH));
+        greyIcon = new ImageIcon(new ImageIcon(getClass().getResource("/grey.png")).getImage().getScaledInstance(ICON_SIZE, ICON_SIZE, Image.SCALE_SMOOTH));
     }
 
     private void createRegisterPage() {
@@ -116,10 +124,13 @@ public class ChatClient {
         userListModel = new DefaultListModel<>();
         userList = new JList<>(userListModel);
 
+        userList.setCellRenderer(new UserListCellRenderer());
+
 
         userList.setFont(new Font("Serif", Font.PLAIN, 18));
 
         userList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        userList.setFixedCellWidth(150);
 
         chatPanel.add(new JScrollPane(userList), BorderLayout.WEST);
 
@@ -189,19 +200,14 @@ public class ChatClient {
 
             sendFile();
 
-        } else if (!message.isEmpty())
-        {
+        } else if (!message.isEmpty()) {
             String receiver = currentChatUser;
-            if (receiver != null)
-            {
+            if (receiver != null) {
                 chatArea.append("you: " + message + "\n");
                 out.println("msg " + receiver + " " + message);
                 messageField.setText("");
 
-            }
-
-            else
-            {
+            } else {
                 chatArea.append("Select a user to send a message.\n");
             }
         }
@@ -262,6 +268,18 @@ public class ChatClient {
         }
     }
 
+    private void updateUserStatus(String username, boolean isOnline) {
+        SwingUtilities.invokeLater(() -> {
+            if (isOnline) {
+                onlineUsers.add(username);
+            } else {
+                onlineUsers.remove(username);
+            }
+            userListModel.set(userListModel.indexOf(username), username); // Update user in the list
+            userList.repaint(); // Repaint the list to reflect changes
+        });
+    }
+
     public class ServerListener extends Thread {
         public void run() {
             try {
@@ -275,11 +293,14 @@ public class ChatClient {
                                 userListModel.addElement(user);
                             }
                         }
-                        updateConnectedUsers();
-                    }
-                    else if (input.startsWith("Chat history with ")) {
+
+                    } else if (input.startsWith("Chat history with ")) {
                         chatArea.setText(""); // Clear chat area for new chat history
                         chatArea.append(input.substring(input.indexOf(":") + 1) + "\n");
+                    } else if (input.startsWith("online")) {
+                        updateUserStatus(input.split(" ")[1], true); // Handle user going online
+                    } else if (input.startsWith("offline")) {
+                        updateUserStatus(input.split(" ")[1], false); // Handle user going offline
                     } else {
                         chatArea.append(input + "\n");
                     }
@@ -288,13 +309,26 @@ public class ChatClient {
                 e.printStackTrace();
             }
         }
-
-        private void updateConnectedUsers() {
-            SwingUtilities.invokeLater(() -> {
-                userList.repaint();
-            });
-        }
     }
+
+        public class UserListCellRenderer extends DefaultListCellRenderer {
+            public Component getListCellRendererComponent(JList<?> list, Object value, int index, boolean isSelected, boolean cellHasFocus) {
+                JLabel label = (JLabel) super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
+                String user = (String) value;
+
+                label.setFont(new Font("Serif", Font.PLAIN, ICON_SIZE));
+
+                if (onlineUsers.contains(user)) {
+                    label.setIcon(greenIcon); // Use green icon for online users
+                } else {
+                    label.setIcon(greyIcon); // Use grey icon for offline users
+                }
+
+                return label;
+            }
+        }
+
 }
+
 
 

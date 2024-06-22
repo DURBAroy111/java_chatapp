@@ -42,6 +42,7 @@ public class ClientHandler extends Thread {
                     }
                 }
             }
+            notifyUserStatus(true);
 
 
             out.println("Login successful. You can now send messages and files.");
@@ -194,11 +195,23 @@ public class ClientHandler extends Thread {
         }
     }
 
+    private void notifyUserStatus(boolean isOnline) {
+        String status = isOnline ? "online" : "offline";
+        synchronized (clientHandlers) {
+            for (ClientHandler clientHandler : clientHandlers) {
+                if (!clientHandler.username.equals(this.username)) {
+                    clientHandler.out.println(status + " " + this.username);
+                }
+            }
+        }
+    }
+
 
 
     private void cleanup() {
         try {
             if (username != null) {
+                notifyUserStatus(false);
                 clientHandlers.remove(this);
                 updateUserList();
             }
